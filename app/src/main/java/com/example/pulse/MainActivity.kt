@@ -31,6 +31,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.pulse.data.Track
 import com.example.pulse.ui.theme.PulseTheme
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.PaddingValues
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -86,6 +89,8 @@ fun MusicScreen(
     val MainText = Color(0xFFF4F3F1)
     val SecondaryText = Color(0xFF9B9CA5)
 
+    var searchQuery by remember { mutableStateOf("") }
+
     Scaffold(
         containerColor = Background,
         bottomBar = {
@@ -98,78 +103,93 @@ fun MusicScreen(
             }
         }
     ) { innerPadding ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Background)
                 .padding(innerPadding)
-                .padding(horizontal = 20.dp)
-                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp),
+            contentPadding = PaddingValues(bottom = 100.dp)
         ) {
-            Spacer(Modifier.height(40.dp))
-            Text(text = "pulse.", color = Accent, fontSize = 32.sp, fontWeight = FontWeight.Black)
-            Spacer(Modifier.height(32.dp))
-            Text(text = "ТВОЁ МУЗЫКАЛЬНОЕ\nПРОСТРАНСТВО", color = MainText, fontSize = 28.sp, lineHeight = 36.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(12.dp))
-            Text(text = "Найди звук под своё настроение.", color = SecondaryText, fontSize = 16.sp)
-            Spacer(Modifier.height(40.dp))
+            // ШАПКА — один большой элемент
+            item {
+                Spacer(Modifier.height(40.dp))
+                Text(text = "pulse.", color = Accent, fontSize = 32.sp, fontWeight = FontWeight.Black)
+                Spacer(Modifier.height(32.dp))
+                Text(text = "ТВОЁ МУЗЫКАЛЬНОЕ\nПРОСТРАНСТВО", color = MainText, fontSize = 28.sp, lineHeight = 36.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(12.dp))
+                Text(text = "Найди звук под своё настроение.", color = SecondaryText, fontSize = 16.sp)
+                Spacer(Modifier.height(40.dp))
 
-            var searchQuery by remember { mutableStateOf("") }
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Что слушаем сегодня?") },
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Поиск", tint = SecondaryText) },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Accent, unfocusedBorderColor = Color(0xFF2D2F34),
-                    focusedTextColor = MainText, unfocusedTextColor = MainText,
-                    focusedPlaceholderColor = SecondaryText, unfocusedPlaceholderColor = SecondaryText,
-                    focusedLeadingIconColor = SecondaryText, unfocusedLeadingIconColor = SecondaryText
-                ),
-                shape = RoundedCornerShape(16.dp),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { if (searchQuery.isNotBlank()) onSearch(searchQuery) })
-            )
-            Spacer(Modifier.height(32.dp))
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Что слушаем сегодня?") },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = "Поиск", tint = SecondaryText) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Accent, unfocusedBorderColor = Color(0xFF2D2F34),
+                        focusedTextColor = MainText, unfocusedTextColor = MainText,
+                        focusedPlaceholderColor = SecondaryText, unfocusedPlaceholderColor = SecondaryText,
+                        focusedLeadingIconColor = SecondaryText, unfocusedLeadingIconColor = SecondaryText
+                    ),
+                    shape = RoundedCornerShape(16.dp),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { if (searchQuery.isNotBlank()) onSearch(searchQuery) })
+                )
+                Spacer(Modifier.height(32.dp))
 
-            Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = Color(0xFF29221F)) {
-                Column(modifier = Modifier.padding(24.dp)) {
-                    Text(text = "PULSE SELECTION", color = Accent, fontSize = 12.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(16.dp))
-                    Text(text = "Включи\nсвой момент.", color = MainText, fontSize = 32.sp, lineHeight = 40.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(12.dp))
-                    Text(text = "Музыка для твоего ритма жизни.", color = SecondaryText, fontSize = 15.sp)
-                    Spacer(Modifier.height(24.dp))
-                    Button(
-                        onClick = { onSearch("top hits 2026") },
-                        colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background),
-                        shape = RoundedCornerShape(14.dp)
-                    ) { Text(text = "Исследовать музыку", fontWeight = FontWeight.Bold, fontSize = 15.sp) }
+                Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = Color(0xFF29221F)) {
+                    Column(modifier = Modifier.padding(24.dp)) {
+                        Text(text = "PULSE SELECTION", color = Accent, fontSize = 12.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(16.dp))
+                        Text(text = "Включи\nсвой момент.", color = MainText, fontSize = 32.sp, lineHeight = 40.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(12.dp))
+                        Text(text = "Музыка для твоего ритма жизни.", color = SecondaryText, fontSize = 15.sp)
+                        Spacer(Modifier.height(24.dp))
+                        Button(
+                            onClick = { onSearch("top hits 2026") },
+                            colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Background),
+                            shape = RoundedCornerShape(14.dp)
+                        ) { Text(text = "Исследовать музыку", fontWeight = FontWeight.Bold, fontSize = 15.sp) }
+                    }
+                }
+                Spacer(Modifier.height(40.dp))
+
+                Text(text = "Выбери жанр", color = MainText, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(16.dp))
+                Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    GenreCard("Pop", Icons.Filled.MusicNote, Color(0xFFE91E63)) { onSearch("genre:\"Pop\"") }
+                    GenreCard("Rock", Icons.Filled.Headset, Color(0xFFF44336)) { onSearch("genre:\"Rock\"") }
+                    GenreCard("Hip-Hop", Icons.Filled.GraphicEq, Color(0xFFFF9800)) { onSearch("genre:\"Hip Hop\"") }
+                    GenreCard("Electronic", Icons.Filled.Memory, Color(0xFF00BCD4)) { onSearch("genre:\"Electronic\"") }
+                    GenreCard("Jazz", Icons.Filled.Mic, Color(0xFF673AB7)) { onSearch("genre:\"Jazz\"") }
+                }
+                Spacer(Modifier.height(40.dp))
+
+                Text(text = "Найденные треки", color = MainText, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(16.dp))
+            }
+
+            // ЗАГРУЗКА
+            if (isLoading) {
+                item {
+                    CircularProgressIndicator(
+                        color = Accent,
+                        modifier = Modifier.fillMaxWidth().padding(top = 40.dp).wrapContentWidth(Alignment.CenterHorizontally)
+                    )
                 }
             }
-            Spacer(Modifier.height(40.dp))
-
-            Text(text = "Выбери настроение", color = MainText, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(16.dp))
-            Row(modifier = Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                MoodCard("Спокойствие", Icons.Filled.Cloud, Color(0xFF293C46)) { onSearch("chill relax") }
-                MoodCard("Энергия", Icons.Filled.Bolt, Color(0xFF453027)) { onSearch("rock energy") }
-                MoodCard("Фокус", Icons.Filled.CenterFocusStrong, Color(0xFF35304A)) { onSearch("lo-fi study") }
-                MoodCard("Ночь", Icons.Filled.NightsStay, Color(0xFF263348)) { onSearch("night jazz") }
+            // ПУСТО
+            else if (tracks.isEmpty()) {
+                item {
+                    Text(text = "Здесь появятся треки. Нажми на кнопку или введи запрос!", color = SecondaryText, fontSize = 14.sp)
+                }
             }
-            Spacer(Modifier.height(40.dp))
-
-            Text(text = "Найденные треки", color = MainText, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(16.dp))
-
-            if (isLoading) {
-                CircularProgressIndicator(color = Accent, modifier = Modifier.align(Alignment.CenterHorizontally))
-            } else if (tracks.isEmpty()) {
-                Text(text = "Здесь появятся треки. Нажми на кнопку или введи запрос!", color = SecondaryText, fontSize = 14.sp)
-            } else {
-                tracks.forEach { track ->
+            // ТРЕКИ — каждый трек отдельный элемент списка
+            else {
+                items(tracks) { track ->
                     TrackRow(
                         track = track,
                         isPlaying = currentTrack?.id == track.id && isPlaying,
@@ -177,14 +197,12 @@ fun MusicScreen(
                     )
                 }
             }
-
-            Spacer(Modifier.height(100.dp))
         }
     }
 }
 
 @Composable
-fun MoodCard(title: String, icon: ImageVector, color: Color, onClick: () -> Unit) {
+fun GenreCard(title: String, icon: ImageVector, color: Color, onClick: () -> Unit) {
     Surface(modifier = Modifier.width(150.dp).clickable { onClick() }, color = color, shape = RoundedCornerShape(18.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Icon(imageVector = icon, contentDescription = title, tint = Color(0xFFF4F3F1), modifier = Modifier.size(32.dp))
@@ -232,6 +250,7 @@ fun TrackRow(track: Track, isPlaying: Boolean, onClick: () -> Unit) {
             )
             Spacer(Modifier.height(4.dp))
             Text(text = track.artist, color = Color(0xFF9B9CA5), fontSize = 14.sp, maxLines = 1)
+
         }
         if (isPlaying) {
             Icon(

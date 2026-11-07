@@ -12,17 +12,20 @@ data class DeezerTrack(
     val title: String?,
     val artist: DeezerArtist?,
     val album: DeezerAlbum?,
-    val preview: String?
+    val preview: String?,
+    val genre: DeezerGenre?
 )
 
 data class DeezerArtist(val name: String?)
 data class DeezerAlbum(val title: String?, val cover_medium: String?)
 
+data class DeezerGenre(val name: String?)
+
 interface DeezerService {
     @GET("search")
     suspend fun search(
         @Query("q") query: String,
-        @Query("limit") limit: Int = 25
+        @Query("limit") limit: Int = 100
     ): DeezerResponse
 }
 
@@ -48,7 +51,8 @@ object MusicApi {
                         artist = it.artist?.name ?: "Unknown",
                         album = it.album?.title ?: "",
                         coverUrl = it.album?.cover_medium ?: "",
-                        previewUrl = it.preview ?: ""
+                        previewUrl = it.preview ?: "",
+                        genre = it.genre?.name ?: "Неизвестный жанр"
                     )
                 }
 
