@@ -1,26 +1,44 @@
 {
   "project_info": {
-    "project_number": "960021719100",
-    "project_id": "pulse-cc7b2",
-    "storage_bucket": "pulse-cc7b2.firebasestorage.app"
+    "project_number": "398180403840",
+    "project_id": "pulse-c0bbe",
+    "storage_bucket": "pulse-c0bbe.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:960021719100:android:601b70b0037ecc7c8afb39",
+        "mobilesdk_app_id": "1:398180403840:android:cdfe913cd8d0e9f3943465",
         "android_client_info": {
           "package_name": "com.example.pulse"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "398180403840-dlsqlrmltgdtt7aiorbqpp23pqel9iud.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.pulse",
+            "certificate_hash": "c00f727c09a0384f9f99c97215a9a9c1f106a4f5"
+          }
+        },
+        {
+          "client_id": "398180403840-2bkvjbnkb4vepc5lhsd8rbvqq5cug6rv.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyC1OUeuUSqIZfoUzxILo4N532_OLuSO3_E"
+          "current_key": "AIzaSyDxDn1bxiSKkxmRFkGm5jPJWOC10EMlv1I"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "398180403840-2bkvjbnkb4vepc5lhsd8rbvqq5cug6rv.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

@@ -52,7 +52,23 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MusicApp() {
-    val viewModel: MusicViewModel = viewModel()
+    val authViewModel: AuthViewModel = viewModel()
+    val musicViewModel: MusicViewModel = viewModel()
+
+    val currentUser by authViewModel.currentUser.collectAsState()
+
+    if (currentUser == null) {
+        LoginScreen(
+            onLoginSuccess = { },
+            viewModel = authViewModel
+        )
+    } else {
+        MainAppContent(viewModel = musicViewModel, authViewModel = authViewModel)
+    }
+}
+
+@Composable
+fun MainAppContent(viewModel: MusicViewModel, authViewModel: AuthViewModel) {
     val tracks by viewModel.tracks.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
@@ -85,10 +101,10 @@ fun MusicApp() {
             },
             onPlayPauseClick = { viewModel.togglePlay() },
             onFavoriteClick = { track -> viewModel.toggleFavorite(track) },
-            onMiniPlayerClick = { showFullPlayer = true }
+            onMiniPlayerClick = { showFullPlayer = true },
+            onLogout = { authViewModel.logout() }
         )
 
-        // Полноэкранный плеер
         AnimatedVisibility(
             visible = showFullPlayer && currentTrack != null,
             enter = slideInVertically(initialOffsetY = { it }),
@@ -124,7 +140,8 @@ fun MusicScreen(
     onTrackClick: (Track) -> Unit,
     onPlayPauseClick: () -> Unit,
     onFavoriteClick: (Track) -> Unit,
-    onMiniPlayerClick: () -> Unit
+    onMiniPlayerClick: () -> Unit,
+    onLogout: () -> Unit
 ) {
     val Background = Color(0xFF101114)
     val Accent = Color(0xFFFF8057)
@@ -154,10 +171,24 @@ fun MusicScreen(
                 .padding(horizontal = 20.dp),
             contentPadding = PaddingValues(bottom = 100.dp)
         ) {
-            // ШАПКА — один большой элемент
+            // шапка один большой элемент
             item {
                 Spacer(Modifier.height(40.dp))
-                Text(text = "pulse.", color = Accent, fontSize = 32.sp, fontWeight = FontWeight.Black)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = "pulse.", color = Accent, fontSize = 32.sp, fontWeight = FontWeight.Black)
+                    IconButton(onClick = onLogout) {
+                        Icon(
+                            Icons.Filled.Logout,
+                            contentDescription = "Выйти",
+                            tint = SecondaryText,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
                 Spacer(Modifier.height(32.dp))
                 Text(text = "ТВОЁ МУЗЫКАЛЬНОЕ\nПРОСТРАНСТВО", color = MainText, fontSize = 28.sp, lineHeight = 36.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(12.dp))
@@ -382,7 +413,8 @@ fun MusicScreenPreview() {
             onTrackClick = {},
             onPlayPauseClick = {},
             onFavoriteClick = {},
-            onMiniPlayerClick = {}
+            onMiniPlayerClick = {},
+            onLogout = {}
         )
     }
 }
