@@ -1,6 +1,5 @@
 package com.example.pulse
 
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.pulse.data.MusicApi
 import com.example.pulse.data.Track
@@ -11,8 +10,12 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
+import com.example.pulse.data.AppDatabase
+import com.example.pulse.data.toEntity
 
 class MusicViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val dao = AppDatabase.getInstance(application).favoriteDao()
     private val player: ExoPlayer = ExoPlayer.Builder(application).build()
     private val _tracks = MutableStateFlow<List<Track>>(emptyList())
     val tracks: StateFlow<List<Track>> = _tracks
@@ -29,6 +32,18 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying
 
+    // Список ID избранных треков
+    private val _favoriteIds = MutableStateFlow<List<Long>>(emptyList())
+
+    val favoriteIds: StateFlow<List<Long>> = _favoriteIds
+
+    init {
+        viewModelScope.launch {
+            dao.getAllFavorites().collect { entities ->
+                _favoriteIds.value = entities.map { it.id }
+            }
+        }
+    }
     fun search(query: String) {
         if (query.isBlank()) return
 
@@ -72,6 +87,17 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             player.play()
             _isPlaying.value = true
+        }
+    }
+
+    //Добавить убрать из избранного
+    fun toggleFavorite(track: Track) {
+        viewModelScope.launch {
+            if (_favoriteIds.value.contains(track.id)) {
+                dao.remove(track.id)
+            } else {
+                dao.add(track.toEntity())
+            }
         }
     }
 

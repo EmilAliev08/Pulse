@@ -55,6 +55,7 @@ fun MusicApp() {
     val errorMessage by viewModel.errorMessage.collectAsState()
     val currentTrack by viewModel.currentTrack.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
+    val favoriteIds by viewModel.favoriteIds.collectAsState()
 
     val context = LocalContext.current
     LaunchedEffect(errorMessage) {
@@ -68,9 +69,11 @@ fun MusicApp() {
         isLoading = isLoading,
         currentTrack = currentTrack,
         isPlaying = isPlaying,
+        favoriteIds = favoriteIds,
         onSearch = { query -> viewModel.search(query) },
         onTrackClick = { track -> viewModel.playTrack(track) },
-        onPlayPauseClick = { viewModel.togglePlay() }
+        onPlayPauseClick = { viewModel.togglePlay() },
+        onFavoriteClick = { track -> viewModel.toggleFavorite(track) }
     )
 }
 
@@ -80,9 +83,11 @@ fun MusicScreen(
     isLoading: Boolean,
     currentTrack: Track?,
     isPlaying: Boolean,
+    favoriteIds: List<Long>,
     onSearch: (String) -> Unit,
     onTrackClick: (Track) -> Unit,
-    onPlayPauseClick: () -> Unit
+    onPlayPauseClick: () -> Unit,
+    onFavoriteClick: (Track) -> Unit
 ) {
     val Background = Color(0xFF101114)
     val Accent = Color(0xFFFF8057)
@@ -193,7 +198,10 @@ fun MusicScreen(
                     TrackRow(
                         track = track,
                         isPlaying = currentTrack?.id == track.id && isPlaying,
-                        onClick = { onTrackClick(track) }
+                        isFavorite = favoriteIds.contains(track.id),
+                        onClick = { onTrackClick(track) },
+                        onFavoriteClick = { onFavoriteClick(track) }
+
                     )
                 }
             }
@@ -213,7 +221,13 @@ fun GenreCard(title: String, icon: ImageVector, color: Color, onClick: () -> Uni
 }
 
 @Composable
-fun TrackRow(track: Track, isPlaying: Boolean, onClick: () -> Unit) {
+fun TrackRow(
+    track: Track,
+    isPlaying: Boolean,
+    isFavorite: Boolean,
+    onClick: () -> Unit,
+    onFavoriteClick: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -221,7 +235,7 @@ fun TrackRow(track: Track, isPlaying: Boolean, onClick: () -> Unit) {
             .clickable { onClick() },
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Иконка ноты вместо обложки
+        // Иконка ноты
         Surface(
             modifier = Modifier.size(56.dp),
             color = Color(0xFF49324C),
@@ -250,20 +264,13 @@ fun TrackRow(track: Track, isPlaying: Boolean, onClick: () -> Unit) {
             )
             Spacer(Modifier.height(4.dp))
             Text(text = track.artist, color = Color(0xFF9B9CA5), fontSize = 14.sp, maxLines = 1)
-
         }
-        if (isPlaying) {
+        // СЕРДЕЧКО (вместо трёх точек)
+        IconButton(onClick = onFavoriteClick) {
             Icon(
-                imageVector = Icons.Filled.PlayArrow,
-                contentDescription = "Играет",
-                tint = Color(0xFFFF8057),
-                modifier = Modifier.size(24.dp)
-            )
-        } else {
-            Icon(
-                imageVector = Icons.Filled.MoreVert,
-                contentDescription = "Меню",
-                tint = Color(0xFF9B9CA5),
+                imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                contentDescription = "Избранное",
+                tint = if (isFavorite) Color(0xFFFF8057) else Color(0xFF9B9CA5),
                 modifier = Modifier.size(24.dp)
             )
         }
@@ -326,9 +333,11 @@ fun MusicScreenPreview() {
             isLoading = false,
             currentTrack = null,
             isPlaying = false,
+            favoriteIds = emptyList(),
             onSearch = {},
             onTrackClick = {},
-            onPlayPauseClick = {}
+            onPlayPauseClick = {},
+            onFavoriteClick = {}
         )
     }
 }
