@@ -34,6 +34,9 @@ import com.example.pulse.ui.theme.PulseTheme
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -56,6 +59,10 @@ fun MusicApp() {
     val currentTrack by viewModel.currentTrack.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
     val favoriteIds by viewModel.favoriteIds.collectAsState()
+    val currentPosition by viewModel.currentPosition.collectAsState()
+    val duration by viewModel.duration.collectAsState()
+
+    var showFullPlayer by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     LaunchedEffect(errorMessage) {
@@ -64,17 +71,46 @@ fun MusicApp() {
         }
     }
 
-    MusicScreen(
-        tracks = tracks,
-        isLoading = isLoading,
-        currentTrack = currentTrack,
-        isPlaying = isPlaying,
-        favoriteIds = favoriteIds,
-        onSearch = { query -> viewModel.search(query) },
-        onTrackClick = { track -> viewModel.playTrack(track) },
-        onPlayPauseClick = { viewModel.togglePlay() },
-        onFavoriteClick = { track -> viewModel.toggleFavorite(track) }
-    )
+    Box(modifier = Modifier.fillMaxSize()) {
+        MusicScreen(
+            tracks = tracks,
+            isLoading = isLoading,
+            currentTrack = currentTrack,
+            isPlaying = isPlaying,
+            favoriteIds = favoriteIds,
+            onSearch = { query -> viewModel.search(query) },
+            onTrackClick = { track ->
+                viewModel.playTrack(track)
+                showFullPlayer = true
+            },
+            onPlayPauseClick = { viewModel.togglePlay() },
+            onFavoriteClick = { track -> viewModel.toggleFavorite(track) },
+            onMiniPlayerClick = { showFullPlayer = true }
+        )
+
+        // Полноэкранный плеер
+        AnimatedVisibility(
+            visible = showFullPlayer && currentTrack != null,
+            enter = slideInVertically(initialOffsetY = { it }),
+            exit = slideOutVertically(targetOffsetY = { it })
+        ) {
+            currentTrack?.let { track ->
+                FullPlayerScreen(
+                    track = track,
+                    isPlaying = isPlaying,
+                    isFavorite = favoriteIds.contains(track.id),
+                    currentPosition = currentPosition,
+                    duration = duration,
+                    onPlayPause = { viewModel.togglePlay() },
+                    onFavorite = { viewModel.toggleFavorite(track) },
+                    onClose = { showFullPlayer = false },
+                    onSeek = { position -> viewModel.seekTo(position) },
+                    onNext = { viewModel.playNext() },
+                    onPrevious = { viewModel.playPrevious() }
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -87,7 +123,8 @@ fun MusicScreen(
     onSearch: (String) -> Unit,
     onTrackClick: (Track) -> Unit,
     onPlayPauseClick: () -> Unit,
-    onFavoriteClick: (Track) -> Unit
+    onFavoriteClick: (Track) -> Unit,
+    onMiniPlayerClick: () -> Unit
 ) {
     val Background = Color(0xFF101114)
     val Accent = Color(0xFFFF8057)
@@ -103,7 +140,8 @@ fun MusicScreen(
                 MiniPlayer(
                     track = currentTrack,
                     isPlaying = isPlaying,
-                    onPlayPauseClick = onPlayPauseClick
+                    onPlayPauseClick = onPlayPauseClick,
+                    onClick = onMiniPlayerClick
                 )
             }
         }
@@ -278,11 +316,17 @@ fun TrackRow(
 }
 
 @Composable
-fun MiniPlayer(track: Track, isPlaying: Boolean, onPlayPauseClick: () -> Unit) {
+fun MiniPlayer(
+    track: Track,
+    isPlaying: Boolean,
+    onPlayPauseClick: () -> Unit,
+    onClick: () -> Unit
+) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .navigationBarsPadding(),
+            .navigationBarsPadding()
+            .clickable { onClick() },
         color = Color(0xFF1D1F24),
         shadowElevation = 8.dp
     ) {
@@ -337,7 +381,8 @@ fun MusicScreenPreview() {
             onSearch = {},
             onTrackClick = {},
             onPlayPauseClick = {},
-            onFavoriteClick = {}
+            onFavoriteClick = {},
+            onMiniPlayerClick = {}
         )
     }
 }

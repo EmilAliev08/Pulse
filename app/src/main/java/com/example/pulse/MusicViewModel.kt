@@ -12,6 +12,8 @@ import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import com.example.pulse.data.AppDatabase
 import com.example.pulse.data.toEntity
+import androidx.media3.common.Player
+import kotlinx.coroutines.delay
 
 class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -32,6 +34,15 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying
 
+    private val _isPlayerReady = MutableStateFlow(false)
+    val isPlayerReady: StateFlow<Boolean> = _isPlayerReady
+
+    private val _currentPosition = MutableStateFlow(0L)
+    val currentPosition: StateFlow<Long> = _currentPosition
+
+    private val _duration = MutableStateFlow(0L)
+    val duration: StateFlow<Long> = _duration
+
     // Список ID избранных треков
     private val _favoriteIds = MutableStateFlow<List<Long>>(emptyList())
 
@@ -43,6 +54,27 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 _favoriteIds.value = entities.map { it.id }
             }
         }
+
+
+        // Слушаем позицию воспроизведения для прогресс-бара
+        viewModelScope.launch {
+            while (true) {
+                if (player.isPlaying) {
+                    _currentPosition.value = player.currentPosition
+                    _duration.value = player.duration
+                }
+                delay(500) // обновляем 2 раза в секунду
+            }
+        }
+
+        // Слушаем события плеера
+        player.addListener(object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_ENDED) {
+                    _isPlaying.value = false
+                }
+            }
+        })
     }
     fun search(query: String) {
         if (query.isBlank()) return
@@ -72,12 +104,12 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun playTrack(track: Track) {
         _currentTrack.value = track
 
-        // ссылка в объект
         val mediaItem = MediaItem.fromUri(track.previewUrl)
         player.setMediaItem(mediaItem)
         player.prepare()
         player.play()
         _isPlaying.value = true
+        _isPlayerReady.value = true
     }
 
     fun togglePlay() {
@@ -100,6 +132,15 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
+    fun seekTo(position: Long) {
+        player.seekTo(position)
+        _currentPosition.value = position
+    }
+
+    fun playNext() {}
+
+    fun playPrevious() {}
 
     override fun onCleared() {
         super.onCleared()
