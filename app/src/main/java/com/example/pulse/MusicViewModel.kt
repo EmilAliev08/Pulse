@@ -138,6 +138,14 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         _currentPosition.value = position
     }
 
+    fun stopMusic() {
+        player.stop()
+        player.clearMediaItems()
+        _isPlaying.value = false
+        _currentTrack.value = null
+        _currentPosition.value = 0
+        _duration.value = 0
+    }
     fun playNext() {}
 
     fun playPrevious() {}

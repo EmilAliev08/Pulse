@@ -71,7 +71,6 @@ fun MusicApp() {
 fun MainAppContent(viewModel: MusicViewModel, authViewModel: AuthViewModel) {
     val tracks by viewModel.tracks.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-    val errorMessage by viewModel.errorMessage.collectAsState()
     val currentTrack by viewModel.currentTrack.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
     val favoriteIds by viewModel.favoriteIds.collectAsState()
@@ -79,52 +78,128 @@ fun MainAppContent(viewModel: MusicViewModel, authViewModel: AuthViewModel) {
     val duration by viewModel.duration.collectAsState()
 
     var showFullPlayer by remember { mutableStateOf(false) }
+    var showMiniPlayer by remember { mutableStateOf(true) }
+    var selectedTab by remember { mutableIntStateOf(0) }
 
-    val context = LocalContext.current
-    LaunchedEffect(errorMessage) {
-        errorMessage?.let {
-            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Контент в зависимости от вкладки
+        Box(modifier = Modifier.weight(1f)) {
+            when (selectedTab) {
+                0 -> MusicScreen(
+                    tracks = tracks,
+                    isLoading = isLoading,
+                    currentTrack = currentTrack,
+                    isPlaying = isPlaying,
+                    favoriteIds = favoriteIds,
+                    onSearch = { query -> viewModel.search(query) },
+                    onTrackClick = { track ->
+                        viewModel.playTrack(track)
+                        showFullPlayer = true
+                        showMiniPlayer = true
+                    },
+                    onPlayPauseClick = { viewModel.togglePlay() },
+                    onFavoriteClick = { track -> viewModel.toggleFavorite(track) },
+                    onMiniPlayerClick = { showFullPlayer = true },
+                    onLogout = { authViewModel.logout() }
+                )
+                1 -> FavoritesScreen(
+                    favoriteIds = favoriteIds,
+                    onTrackClick = { track ->
+                        viewModel.playTrack(track)
+                        showFullPlayer = true
+                        showMiniPlayer = true
+                    },
+                    onRemoveFavorite = { track -> viewModel.toggleFavorite(track) }
+                )
+            }
+        }
+
+        // Мини-плеер
+        val currentTrackLocal = currentTrack
+        if (currentTrackLocal != null && showMiniPlayer) {
+            MiniPlayer(
+                track = currentTrackLocal,
+                isPlaying = isPlaying,
+                onPlayPauseClick = { viewModel.togglePlay() },
+                onClick = { showFullPlayer = true },
+                onClose = {
+                    showMiniPlayer = false
+                    viewModel.stopMusic()
+                }
+            )
+        }
+
+        // Компактная нижняя навигация
+        NavigationBar(
+            containerColor = Color(0xFF1D1F24),
+            contentColor = Color(0xFF9B9CA5),
+            tonalElevation = 0.dp,
+            modifier = Modifier.height(84.dp)
+        ) {
+            NavigationBarItem(
+                icon = {
+                    Icon(
+                        Icons.Filled.Home,
+                        contentDescription = "Главная",
+                        modifier = Modifier.size(22.dp)
+                    )
+                },
+                label = { Text("Главная", fontSize = 11.sp) },
+                selected = selectedTab == 0,
+                onClick = { selectedTab = 0 },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = Color(0xFFFF8057),
+                    selectedTextColor = Color(0xFFFF8057),
+                    unselectedIconColor = Color(0xFF9B9CA5),
+                    unselectedTextColor = Color(0xFF9B9CA5),
+                    indicatorColor = Color.Transparent
+                )
+            )
+            NavigationBarItem(
+                icon = {
+                    Icon(
+                        Icons.Filled.Favorite,
+                        contentDescription = "Избранное",
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
+                label = { Text("Избранное", fontSize = 11.sp) },
+                selected = selectedTab == 1,
+                onClick = { selectedTab = 1 },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = Color(0xFFFF8057),
+                    selectedTextColor = Color(0xFFFF8057),
+                    unselectedIconColor = Color(0xFF9B9CA5),
+                    unselectedTextColor = Color(0xFF9B9CA5),
+                    indicatorColor = Color.Transparent
+                )
+            )
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        MusicScreen(
-            tracks = tracks,
-            isLoading = isLoading,
-            currentTrack = currentTrack,
-            isPlaying = isPlaying,
-            favoriteIds = favoriteIds,
-            onSearch = { query -> viewModel.search(query) },
-            onTrackClick = { track ->
-                viewModel.playTrack(track)
-                showFullPlayer = true
-            },
-            onPlayPauseClick = { viewModel.togglePlay() },
-            onFavoriteClick = { track -> viewModel.toggleFavorite(track) },
-            onMiniPlayerClick = { showFullPlayer = true },
-            onLogout = { authViewModel.logout() }
-        )
 
-        AnimatedVisibility(
-            visible = showFullPlayer && currentTrack != null,
-            enter = slideInVertically(initialOffsetY = { it }),
-            exit = slideOutVertically(targetOffsetY = { it })
-        ) {
-            currentTrack?.let { track ->
-                FullPlayerScreen(
-                    track = track,
-                    isPlaying = isPlaying,
-                    isFavorite = favoriteIds.contains(track.id),
-                    currentPosition = currentPosition,
-                    duration = duration,
-                    onPlayPause = { viewModel.togglePlay() },
-                    onFavorite = { viewModel.toggleFavorite(track) },
-                    onClose = { showFullPlayer = false },
-                    onSeek = { position -> viewModel.seekTo(position) },
-                    onNext = { viewModel.playNext() },
-                    onPrevious = { viewModel.playPrevious() }
-                )
-            }
+    AnimatedVisibility(
+        visible = showFullPlayer && currentTrack != null,
+        enter = slideInVertically(initialOffsetY = { it }),
+        exit = slideOutVertically(targetOffsetY = { it })
+    ) {
+        currentTrack?.let { track ->
+            FullPlayerScreen(
+                track = track,
+                isPlaying = isPlaying,
+                isFavorite = favoriteIds.contains(track.id),
+                currentPosition = currentPosition,
+                duration = duration,
+                onPlayPause = { viewModel.togglePlay() },
+                onFavorite = { viewModel.toggleFavorite(track) },
+                onClose = {
+                    showFullPlayer = false
+                    showMiniPlayer = true
+                },
+                onSeek = { position -> viewModel.seekTo(position) },
+                onNext = { viewModel.playNext() },
+                onPrevious = { viewModel.playPrevious() }
+            )
         }
     }
 }
@@ -150,27 +225,13 @@ fun MusicScreen(
 
     var searchQuery by remember { mutableStateOf("") }
 
-    Scaffold(
-        containerColor = Background,
-        bottomBar = {
-            if (currentTrack != null) {
-                MiniPlayer(
-                    track = currentTrack,
-                    isPlaying = isPlaying,
-                    onPlayPauseClick = onPlayPauseClick,
-                    onClick = onMiniPlayerClick
-                )
-            }
-        }
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Background)
-                .padding(innerPadding)
-                .padding(horizontal = 20.dp),
-            contentPadding = PaddingValues(bottom = 100.dp)
-        ) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Background)
+            .padding(horizontal = 20.dp),
+        contentPadding = PaddingValues(bottom = 140.dp)
+    ) {
             // шапка один большой элемент
             item {
                 Spacer(Modifier.height(40.dp))
@@ -276,7 +337,6 @@ fun MusicScreen(
             }
         }
     }
-}
 
 @Composable
 fun GenreCard(title: String, icon: ImageVector, color: Color, onClick: () -> Unit) {
@@ -351,22 +411,24 @@ fun MiniPlayer(
     track: Track,
     isPlaying: Boolean,
     onPlayPauseClick: () -> Unit,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .navigationBarsPadding()
             .clickable { onClick() },
         color = Color(0xFF1D1F24),
-        shadowElevation = 8.dp
+        shadowElevation = 4.dp
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Обложка
             Surface(
-                modifier = Modifier.size(44.dp),
+                modifier = Modifier.size(40.dp),
                 color = Color(0xFF49324C),
                 shape = RoundedCornerShape(8.dp)
             ) {
@@ -378,21 +440,46 @@ fun MiniPlayer(
                         imageVector = Icons.Filled.MusicNote,
                         contentDescription = null,
                         tint = Color(0xFFF4F3F1),
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
             Spacer(Modifier.width(12.dp))
+
+            // Название и исполнитель
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = track.title, color = Color(0xFFF4F3F1), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                Text(text = track.artist, color = Color(0xFF9B9CA5), fontSize = 12.sp, maxLines = 1)
+                Text(
+                    text = track.title,
+                    color = Color(0xFFF4F3F1),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1
+                )
+                Text(
+                    text = track.artist,
+                    color = Color(0xFF9B9CA5),
+                    fontSize = 11.sp,
+                    maxLines = 1
+                )
             }
+
+            // Кнопка Play/Pause
             IconButton(onClick = onPlayPauseClick) {
                 Icon(
                     imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                     contentDescription = "Управление",
                     tint = Color(0xFFFF8057),
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+
+            // Кнопка закрытия (X)
+            IconButton(onClick = onClose) {
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = "Скрыть плеер",
+                    tint = Color(0xFF9B9CA5),
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }
