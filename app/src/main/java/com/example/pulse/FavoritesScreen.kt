@@ -35,11 +35,9 @@ fun FavoritesScreen(
     val db = remember { AppDatabase.getInstance(context) }
     val scope = rememberCoroutineScope()
 
-    // Загружаем избранные треки через Flow
     val favoriteEntities by db.favoriteDao().getAllFavorites()
         .collectAsState(initial = emptyList())
 
-    // Конвертируем FavoriteTrackEntity в Track
     val favoriteTracks = favoriteEntities.map { it.toTrack() }
 
     Column(
@@ -105,7 +103,8 @@ fun FavoritesScreen(
                                 db.favoriteDao().remove(track.id)
                                 onRemoveFavorite(track)
                             }
-                        }
+                        },
+                        onImageClick = { }
                     )
                 }
             }

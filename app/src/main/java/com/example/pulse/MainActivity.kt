@@ -2,6 +2,7 @@ package com.example.pulse
 
 import android.os.Bundle
 import android.widget.Toast
+import androidx.compose.foundation.Image
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -37,6 +38,13 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.rememberAsyncImagePainter
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.rememberLauncherForActivityResult
+import android.net.Uri
+import java.io.File
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -80,6 +88,20 @@ fun MainAppContent(viewModel: MusicViewModel, authViewModel: AuthViewModel) {
     var showFullPlayer by remember { mutableStateOf(false) }
     var showMiniPlayer by remember { mutableStateOf(true) }
     var selectedTab by remember { mutableIntStateOf(0) }
+    var selectedTrackId by remember { mutableLongStateOf(0L) }
+    var coverUpdateTrigger by remember { mutableIntStateOf(0) }
+
+    val context = LocalContext.current
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            if (selectedTrackId > 0) {
+                CoverManager.saveCover(context, selectedTrackId, it)
+                coverUpdateTrigger++
+            }
+        }
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         // Контент в зависимости от вкладки
@@ -100,7 +122,12 @@ fun MainAppContent(viewModel: MusicViewModel, authViewModel: AuthViewModel) {
                     onPlayPauseClick = { viewModel.togglePlay() },
                     onFavoriteClick = { track -> viewModel.toggleFavorite(track) },
                     onMiniPlayerClick = { showFullPlayer = true },
-                    onLogout = { authViewModel.logout() }
+                    onLogout = { authViewModel.logout() },
+                    onImageClick = { track ->
+                        selectedTrackId = track.id
+                        imagePickerLauncher.launch("image/*")
+                    },
+                    coverUpdateTrigger = coverUpdateTrigger
                 )
                 1 -> FavoritesScreen(
                     favoriteIds = favoriteIds,
@@ -160,7 +187,7 @@ fun MainAppContent(viewModel: MusicViewModel, authViewModel: AuthViewModel) {
                     Icon(
                         Icons.Filled.Favorite,
                         contentDescription = "Избранное",
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 },
                 label = { Text("Избранное", fontSize = 11.sp) },
@@ -216,7 +243,9 @@ fun MusicScreen(
     onPlayPauseClick: () -> Unit,
     onFavoriteClick: (Track) -> Unit,
     onMiniPlayerClick: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onImageClick: (Track) -> Unit,
+    coverUpdateTrigger: Int
 ) {
     val Background = Color(0xFF101114)
     val Accent = Color(0xFFFF8057)
@@ -224,6 +253,7 @@ fun MusicScreen(
     val SecondaryText = Color(0xFF9B9CA5)
 
     var searchQuery by remember { mutableStateOf("") }
+    val context = LocalContext.current
 
     LazyColumn(
         modifier = Modifier
@@ -245,7 +275,7 @@ fun MusicScreen(
                         Icon(
                             Icons.Filled.Logout,
                             contentDescription = "Выйти",
-                            tint = SecondaryText,
+                            tint = Color(0xFF9B9CA5),
                             modifier = Modifier.size(24.dp)
                         )
                     }
@@ -324,14 +354,15 @@ fun MusicScreen(
             }
             // ТРЕКИ — каждый трек отдельный элемент списка
             else {
-                items(tracks) { track ->
+                items(tracks, key = { "${it.id}_$coverUpdateTrigger" }) { track ->
                     TrackRow(
                         track = track,
                         isPlaying = currentTrack?.id == track.id && isPlaying,
                         isFavorite = favoriteIds.contains(track.id),
+                        customCoverPath = CoverManager.getCoverPath(context, track.id),
                         onClick = { onTrackClick(track) },
-                        onFavoriteClick = { onFavoriteClick(track) }
-
+                        onFavoriteClick = { onFavoriteClick(track) },
+                        onImageClick = { onImageClick(track) }
                     )
                 }
             }
@@ -354,8 +385,10 @@ fun TrackRow(
     track: Track,
     isPlaying: Boolean,
     isFavorite: Boolean,
+    customCoverPath: String? = null,
     onClick: () -> Unit,
-    onFavoriteClick: () -> Unit
+    onFavoriteClick: () -> Unit,
+    onImageClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -370,16 +403,26 @@ fun TrackRow(
             color = Color(0xFF49324C),
             shape = RoundedCornerShape(12.dp)
         ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.fillMaxSize()
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.MusicNote,
+            if (customCoverPath != null) {
+                // Показываем загруженную картинку
+                Image(
+                    painter = rememberAsyncImagePainter(customCoverPath),
                     contentDescription = null,
-                    tint = Color(0xFFF4F3F1),
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
                 )
+            } else {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.MusicNote,
+                        contentDescription = null,
+                        tint = Color(0xFFF4F3F1),
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
             }
         }
         Spacer(Modifier.width(14.dp))
@@ -394,7 +437,16 @@ fun TrackRow(
             Spacer(Modifier.height(4.dp))
             Text(text = track.artist, color = Color(0xFF9B9CA5), fontSize = 14.sp, maxLines = 1)
         }
-        // СЕРДЕЧКО (вместо трёх точек)
+
+        IconButton(onClick = onImageClick) {
+            Icon(
+                Icons.Filled.Landscape,
+                contentDescription = "Предложить картинку",
+                tint = Color(0xFF9B9CA5),
+                modifier = Modifier.size(24.dp)
+            )
+        }
+        // СЕРДЕЧКО
         IconButton(onClick = onFavoriteClick) {
             Icon(
                 imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
@@ -501,7 +553,9 @@ fun MusicScreenPreview() {
             onPlayPauseClick = {},
             onFavoriteClick = {},
             onMiniPlayerClick = {},
-            onLogout = {}
+            onLogout = {},
+            onImageClick = {},
+            coverUpdateTrigger = 0
         )
     }
 }
