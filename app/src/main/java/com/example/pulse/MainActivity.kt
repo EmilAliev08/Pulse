@@ -45,6 +45,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
 import android.net.Uri
 import java.io.File
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.draw.clip
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -84,6 +87,8 @@ fun MainAppContent(viewModel: MusicViewModel, authViewModel: AuthViewModel) {
     val favoriteIds by viewModel.favoriteIds.collectAsState()
     val currentPosition by viewModel.currentPosition.collectAsState()
     val duration by viewModel.duration.collectAsState()
+    val favoriteTracks by viewModel.favoriteTracks.collectAsState()
+
 
     var showFullPlayer by remember { mutableStateOf(false) }
     var showMiniPlayer by remember { mutableStateOf(true) }
@@ -115,7 +120,7 @@ fun MainAppContent(viewModel: MusicViewModel, authViewModel: AuthViewModel) {
                     favoriteIds = favoriteIds,
                     onSearch = { query -> viewModel.search(query) },
                     onTrackClick = { track ->
-                        viewModel.playTrack(track)
+                        viewModel.playTrack(track, tracks) // <-- Передаем список поиска
                         showFullPlayer = true
                         showMiniPlayer = true
                     },
@@ -130,9 +135,11 @@ fun MainAppContent(viewModel: MusicViewModel, authViewModel: AuthViewModel) {
                     coverUpdateTrigger = coverUpdateTrigger
                 )
                 1 -> FavoritesScreen(
-                    favoriteIds = favoriteIds,
+                    tracks = favoriteTracks,
+                    currentTrack = currentTrack,
+                    isPlaying = isPlaying,
                     onTrackClick = { track ->
-                        viewModel.playTrack(track)
+                        viewModel.playTrack(track, favoriteTracks) // <-- Передаем избранное
                         showFullPlayer = true
                         showMiniPlayer = true
                     },
@@ -147,7 +154,12 @@ fun MainAppContent(viewModel: MusicViewModel, authViewModel: AuthViewModel) {
             MiniPlayer(
                 track = currentTrackLocal,
                 isPlaying = isPlaying,
+                currentPosition = currentPosition,
+                duration = duration,
                 onPlayPauseClick = { viewModel.togglePlay() },
+                onSeek = { position -> viewModel.seekTo(position) },
+                onNextClick = { viewModel.playNext() },
+                onPreviousClick = { viewModel.playPrevious() },
                 onClick = { showFullPlayer = true },
                 onClose = {
                     showMiniPlayer = false
@@ -462,77 +474,100 @@ fun TrackRow(
 fun MiniPlayer(
     track: Track,
     isPlaying: Boolean,
+    currentPosition: Long,
+    duration: Long,
     onPlayPauseClick: () -> Unit,
+    onSeek: (Long) -> Unit,
+    onNextClick: () -> Unit,   // <-- НОВЫЙ ПАРАМЕТР
+    onPreviousClick: () -> Unit, // <-- НОВЫЙ ПАРАМЕТР
     onClick: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val coverPath = CoverManager.getCoverPath(context, track.id)
+    val progress = if (duration > 0) currentPosition.toFloat() / duration.toFloat() else 0f
+
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
+        modifier = modifier.fillMaxWidth().clickable { onClick() },
         color = Color(0xFF1D1F24),
         shadowElevation = 4.dp
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Обложка
-            Surface(
-                modifier = Modifier.size(40.dp),
-                color = Color(0xFF49324C),
-                shape = RoundedCornerShape(8.dp)
+        Column {
+            // Полоска прогресса
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(14.dp)
+                    .background(Color(0xFF2D2F34))
+                    .pointerInput(Unit) {
+                        detectTapGestures { offset ->
+                            if (duration > 0) {
+                                val clickRatio = (offset.x / size.width).coerceIn(0f, 1f)
+                                onSeek((clickRatio * duration).toLong())
+                            }
+                        }
+                    },
+                contentAlignment = Alignment.CenterStart
             ) {
                 Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.MusicNote,
-                        contentDescription = null,
-                        tint = Color(0xFFF4F3F1),
-                        modifier = Modifier.size(20.dp)
-                    )
+                    modifier = Modifier
+                        .fillMaxWidth(progress)
+                        .height(3.dp)
+                        .background(Color(0xFFFF8057))
+                )
+            }
+
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Previous
+                IconButton(onClick = onPreviousClick) {
+                    Icon(Icons.Filled.SkipPrevious, "Предыдущий",
+                        tint = Color(0xFFF4F3F1), modifier = Modifier.size(24.dp))
                 }
-            }
-            Spacer(Modifier.width(12.dp))
 
-            // Название и исполнитель
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = track.title,
-                    color = Color(0xFFF4F3F1),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1
-                )
-                Text(
-                    text = track.artist,
-                    color = Color(0xFF9B9CA5),
-                    fontSize = 11.sp,
-                    maxLines = 1
-                )
-            }
+                // Обложка
+                Surface(
+                    modifier = Modifier.size(40.dp),
+                    color = Color(0xFF49324C),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    if (coverPath != null) {
+                        Image(
+                            painter = rememberAsyncImagePainter(coverPath),
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Icon(Icons.Filled.MusicNote, null,
+                                tint = Color(0xFFF4F3F1), modifier = Modifier.size(20.dp))
+                        }
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
 
-            // Кнопка Play/Pause
-            IconButton(onClick = onPlayPauseClick) {
-                Icon(
-                    imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = "Управление",
-                    tint = Color(0xFFFF8057),
-                    modifier = Modifier.size(28.dp)
-                )
-            }
+                // Текст
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = track.title, color = Color(0xFFF4F3F1), fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold, maxLines = 1)
+                    Text(text = track.artist, color = Color(0xFF9B9CA5), fontSize = 11.sp, maxLines = 1)
+                }
 
-            // Кнопка закрытия (X)
-            IconButton(onClick = onClose) {
-                Icon(
-                    Icons.Filled.Close,
-                    contentDescription = "Скрыть плеер",
-                    tint = Color(0xFF9B9CA5),
-                    modifier = Modifier.size(20.dp)
-                )
+                // Next
+                IconButton(onClick = onNextClick) {
+                    Icon(Icons.Filled.SkipNext, "Следующий",
+                        tint = Color(0xFFF4F3F1), modifier = Modifier.size(24.dp))
+                }
+
+                // Close
+                IconButton(onClick = onClose) {
+                    Icon(Icons.Filled.Close, "Скрыть плеер",
+                        tint = Color(0xFF9B9CA5), modifier = Modifier.size(20.dp))
+                }
             }
         }
     }

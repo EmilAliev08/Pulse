@@ -15,30 +15,20 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.pulse.data.AppDatabase
 import com.example.pulse.data.Track
-import kotlinx.coroutines.launch
-import com.example.pulse.data.toTrack
 
 @Composable
 fun FavoritesScreen(
-    favoriteIds: List<Long>,
+    tracks: List<Track>,          // <-- Принимает список треков из ViewModel
+    currentTrack: Track?,         // <-- Для подсветки играющего
+    isPlaying: Boolean,           // <-- Статус воспроизведения
     onTrackClick: (Track) -> Unit,
     onRemoveFavorite: (Track) -> Unit
 ) {
     val Background = Color(0xFF101114)
-    val Accent = Color(0xFFFF8057)
     val MainText = Color(0xFFF4F3F1)
     val SecondaryText = Color(0xFF9B9CA5)
-
     val context = LocalContext.current
-    val db = remember { AppDatabase.getInstance(context) }
-    val scope = rememberCoroutineScope()
-
-    val favoriteEntities by db.favoriteDao().getAllFavorites()
-        .collectAsState(initial = emptyList())
-
-    val favoriteTracks = favoriteEntities.map { it.toTrack() }
 
     Column(
         modifier = Modifier
@@ -47,44 +37,19 @@ fun FavoritesScreen(
             .padding(horizontal = 20.dp)
     ) {
         Spacer(Modifier.height(40.dp))
-        Text(
-            text = "Избранное",
-            color = MainText,
-            fontSize = 32.sp,
-            fontWeight = FontWeight.Bold
-        )
+        Text(text = "Избранное", color = MainText, fontSize = 32.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(8.dp))
-        Text(
-            text = "${favoriteTracks.size} треков",
-            color = SecondaryText,
-            fontSize = 16.sp
-        )
+        Text(text = "${tracks.size} треков", color = SecondaryText, fontSize = 16.sp)
         Spacer(Modifier.height(24.dp))
 
-        if (favoriteTracks.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
+        if (tracks.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        Icons.Filled.FavoriteBorder,
-                        contentDescription = null,
-                        tint = SecondaryText,
-                        modifier = Modifier.size(64.dp)
-                    )
+                    Icon(Icons.Filled.FavoriteBorder, null, tint = SecondaryText, modifier = Modifier.size(64.dp))
                     Spacer(Modifier.height(16.dp))
-                    Text(
-                        text = "Здесь появятся избранные треки",
-                        color = SecondaryText,
-                        fontSize = 16.sp
-                    )
+                    Text("Здесь появятся избранные треки", color = SecondaryText, fontSize = 16.sp)
                     Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = "Нажми ❤️ на треке, чтобы добавить",
-                        color = SecondaryText,
-                        fontSize = 14.sp
-                    )
+                    Text("Нажми ❤️ на треке, чтобы добавить", color = SecondaryText, fontSize = 14.sp)
                 }
             }
         } else {
@@ -92,18 +57,14 @@ fun FavoritesScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = 100.dp)
             ) {
-                items(favoriteTracks) { track ->
+                items(tracks, key = { it.id }) { track ->
                     TrackRow(
                         track = track,
-                        isPlaying = false,
+                        isPlaying = currentTrack?.id == track.id && isPlaying,
                         isFavorite = true,
+                        customCoverPath = CoverManager.getCoverPath(context, track.id),
                         onClick = { onTrackClick(track) },
-                        onFavoriteClick = {
-                            scope.launch {
-                                db.favoriteDao().remove(track.id)
-                                onRemoveFavorite(track)
-                            }
-                        },
+                        onFavoriteClick = { onRemoveFavorite(track) },
                         onImageClick = { }
                     )
                 }

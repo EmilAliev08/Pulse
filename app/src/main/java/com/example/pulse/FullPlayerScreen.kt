@@ -19,6 +19,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.pulse.data.Track
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.rememberAsyncImagePainter
+import androidx.compose.ui.platform.LocalContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -94,7 +98,7 @@ fun FullPlayerScreen(
 
             Spacer(Modifier.height(40.dp))
 
-            // Большая обложка (пока заглушка)
+            // Большая обложка
             Surface(
                 modifier = Modifier
                     .size(320.dp)
@@ -102,16 +106,28 @@ fun FullPlayerScreen(
                 color = Color(0xFF49324C),
                 shadowElevation = 20.dp
             ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    Icon(
-                        Icons.Filled.MusicNote,
+                val context = LocalContext.current
+                val coverPath = CoverManager.getCoverPath(context, track.id)
+
+                if (coverPath != null) {
+                    Image(
+                        painter = rememberAsyncImagePainter(coverPath),
                         contentDescription = null,
-                        tint = MainText,
-                        modifier = Modifier.size(120.dp)
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
                     )
+                } else {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Icon(
+                            Icons.Filled.MusicNote,
+                            contentDescription = null,
+                            tint = MainText,
+                            modifier = Modifier.size(120.dp)
+                        )
+                    }
                 }
             }
 
