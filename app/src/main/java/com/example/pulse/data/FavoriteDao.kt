@@ -24,4 +24,12 @@ interface FavoriteDao {
     // В избранном ли трек
     @Query("SELECT EXISTS(SELECT 1 FROM favorite_tracks WHERE id = :trackId)")
     suspend fun isFavorite(trackId: Long): Boolean
+
+    // Поиск всех треков конкретного исполнителя в избранном
+    @Query("SELECT * FROM favorite_tracks WHERE artist = :artistName")
+    fun getTracksByArtist(artistName: String): Flow<List<FavoriteTrackEntity>>
+
+    // Получение случайных треков для дополнения волны (если у автора мало треков)
+    @Query("SELECT * FROM favorite_tracks ORDER BY RANDOM() LIMIT :limit")
+    suspend fun getRandomTracks(limit: Int): List<FavoriteTrackEntity>
 }

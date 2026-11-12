@@ -15,13 +15,15 @@ import com.example.pulse.data.toEntity
 import androidx.media3.common.Player
 import kotlinx.coroutines.delay
 import com.example.pulse.data.toTrack
+import com.example.pulse.data.TrackStatsEntity
+import kotlinx.coroutines.flow.first
 
 class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private val dao = AppDatabase.getInstance(application).favoriteDao()
+    private val statsDao = AppDatabase.getInstance(application).statsDao()
     private val player: ExoPlayer = ExoPlayer.Builder(application).build()
 
-    // Очередь треков
     private val _playlist = MutableStateFlow<List<Track>>(emptyList())
     val playlist: StateFlow<List<Track>> = _playlist
 
@@ -58,6 +60,12 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _favoriteTracks = MutableStateFlow<List<Track>>(emptyList())
     val favoriteTracks: StateFlow<List<Track>> = _favoriteTracks
 
+    private val _waveTracks = MutableStateFlow<List<Track>>(emptyList())
+    val waveTracks: StateFlow<List<Track>> = _waveTracks
+
+    private val _isWaveLoading = MutableStateFlow(false)
+    val isWaveLoading: StateFlow<Boolean> = _isWaveLoading
+
     init {
         viewModelScope.launch {
             dao.getAllFavorites().collect { entities ->
@@ -79,7 +87,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         player.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (playbackState == Player.STATE_ENDED) {
-                    playNext() // Автопереход на следующий трек
+                    playNext()
                 }
             }
         })
@@ -106,7 +114,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun playTrack(track: Track, playlist: List<Track> = emptyList()) {
         _currentTrack.value = track
 
-        // Формируем очередь
         if (playlist.isNotEmpty()) {
             _playlist.value = playlist
             _playlistIndex.value = playlist.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
@@ -123,6 +130,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         player.play()
         _isPlaying.value = true
         _isPlayerReady.value = true
+
+        recordPlay(track)
     }
 
     fun togglePlay() {
@@ -173,7 +182,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         val index = _playlistIndex.value
         if (current.isEmpty()) return
 
-        // Если трек играет >3 сек, перемотать в начало, иначе предыдущий
         if (player.currentPosition > 3000) {
             player.seekTo(0)
             _currentPosition.value = 0
@@ -183,6 +191,90 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         val prevIndex = if (index - 1 < 0) current.size - 1 else index - 1
         _playlistIndex.value = prevIndex
         playTrack(current[prevIndex])
+    }
+
+    private fun recordPlay(track: Track) {
+        viewModelScope.launch {
+            val current = statsDao.getStatsById(track.id)
+            val newCount = (current?.playCount ?: 0) + 1
+            statsDao.upsert(TrackStatsEntity(track.id, newCount))
+        }
+    }
+
+    fun generateWave() {
+        viewModelScope.launch {
+            _isWaveLoading.value = true
+
+            try {
+                // 1. Читаем таблицу track_stats ПРЯМО ИЗ БД
+                val topStats = statsDao.getTopTracks(50).first()
+
+                if (topStats.isEmpty()) {
+                    _waveTracks.value = _favoriteTracks.value.shuffled().take(20)
+                    return@launch
+                }
+
+                // 2. Берем ВСЕ избранные треки ПРЯМО ИЗ БД
+                val allFavEntities = dao.getAllFavorites().first()
+                val allFavTracks = allFavEntities.map { it.toTrack() }
+
+                // 3. ⚠️ АНАЛИЗ ЧАСТОТЫ ИСПОЛНИТЕЛЕЙ
+                // Сопоставляем ID из статистики с избранным и считаем упоминания артистов
+                val artistFrequency = mutableMapOf<String, Int>()
+
+                for (stat in topStats) {
+                    val found = allFavTracks.find { it.id == stat.trackId }
+                    if (found != null && !found.artist.isNullOrBlank()) {
+                        val artist = found.artist.trim()
+                        artistFrequency[artist] = artistFrequency.getOrDefault(artist, 0) + 1
+                    }
+                }
+
+                // Сортируем артистов по частоте (от большего к меньшему)
+                val sortedArtists = artistFrequency.entries
+                    .sortedByDescending { it.value }
+                    .map { it.key }
+                    .take(3) // Берем топ-3 самых популярных артиста
+
+                android.util.Log.d("PULSE_WAVE", "Top artists by frequency: $sortedArtists")
+
+                if (sortedArtists.isEmpty()) {
+                    _waveTracks.value = allFavTracks.shuffled().take(20)
+                    return@launch
+                }
+
+                // 4. Делаем ОБЫЧНЫЙ ПОИСК по каждому из топ-артистов
+                val results = mutableListOf<Track>()
+                for (artist in sortedArtists) {
+                    try {
+                        val searchResult = MusicApi.search(artist).getOrNull() ?: emptyList()
+                        results.addAll(searchResult.take(20)) // По 20 треков на артиста
+                    } catch (e: Exception) {
+                        continue
+                    }
+                }
+
+                // 5. Формируем волну: сначала лайкнутые треки этих артистов, потом новые
+                val likedByTheseArtists = allFavTracks.filter {
+                    sortedArtists.any { a -> it.artist.equals(a, ignoreCase = true) }
+                }
+
+                val newRecommendations = results.distinctBy { it.id }
+                    .filter { it.id !in likedByTheseArtists.map { t -> t.id }.toSet() }
+
+                val finalWave = (likedByTheseArtists.shuffled().take(15) +
+                        newRecommendations.shuffled().take(65))
+                    .distinctBy { it.id }
+                    .take(80)
+
+                _waveTracks.value = if (finalWave.isNotEmpty()) finalWave else allFavTracks.shuffled().take(20)
+
+            } catch (e: Exception) {
+                _waveTracks.value = _favoriteTracks.value.shuffled().take(20)
+            } finally {
+                _isWaveLoading.value = false
+            }
+        }
     }
 
     override fun onCleared() {
