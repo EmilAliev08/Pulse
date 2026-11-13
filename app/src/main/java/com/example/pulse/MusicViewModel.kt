@@ -93,6 +93,40 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         })
     }
 
+    fun refreshFavoritePreviews() {
+        viewModelScope.launch {
+            val currentFavorites = _favoriteTracks.value
+            if (currentFavorites.isEmpty()) return@launch
+
+            val updatedFavorites = mutableListOf<Track>()
+
+            for (track in currentFavorites) {
+                try {
+                    // Ищем трек по названию и артисту
+                    val query = "${track.artist} ${track.title}"
+                    val result = MusicApi.search(query).getOrNull() ?: emptyList()
+
+                    // Находим трек с таким же ID или первым совпадением
+                    val freshTrack = result.find { it.id == track.id }
+                        ?: result.find {
+                            it.title.equals(track.title, ignoreCase = true) &&
+                                    it.artist.equals(track.artist, ignoreCase = true)
+                        }
+
+                    if (freshTrack != null && freshTrack.previewUrl.isNotBlank()) {
+                        updatedFavorites.add(freshTrack)
+                    } else {
+                        updatedFavorites.add(track) // Оставляем старый, если не нашли
+                    }
+                } catch (e: Exception) {
+                    updatedFavorites.add(track) // При ошибке оставляем старый
+                }
+            }
+
+            _favoriteTracks.value = updatedFavorites
+        }
+    }
+
     fun search(query: String) {
         if (query.isBlank()) return
         viewModelScope.launch {
@@ -112,26 +146,33 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun playTrack(track: Track, playlist: List<Track> = emptyList()) {
-        _currentTrack.value = track
+        viewModelScope.launch {
+            // 1. Получаем свежую ссылку из интернета
+            val freshTrack = getFreshTrack(track)
 
-        if (playlist.isNotEmpty()) {
-            _playlist.value = playlist
-            _playlistIndex.value = playlist.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
-        } else if (_playlist.value.none { it.id == track.id }) {
-            _playlist.value = listOf(track)
-            _playlistIndex.value = 0
-        } else {
-            _playlistIndex.value = _playlist.value.indexOfFirst { it.id == track.id }
+            // 2. Обновляем UI
+            _currentTrack.value = freshTrack
+
+            if (playlist.isNotEmpty()) {
+                _playlist.value = playlist
+                _playlistIndex.value = playlist.indexOfFirst { it.id == freshTrack.id }.coerceAtLeast(0)
+            } else if (_playlist.value.none { it.id == freshTrack.id }) {
+                _playlist.value = listOf(freshTrack)
+                _playlistIndex.value = 0
+            } else {
+                _playlistIndex.value = _playlist.value.indexOfFirst { it.id == freshTrack.id }
+            }
+
+            // 3. Запускаем плеер с НОВОЙ ссылкой
+            val mediaItem = MediaItem.fromUri(freshTrack.previewUrl)
+            player.setMediaItem(mediaItem)
+            player.prepare()
+            player.play()
+            _isPlaying.value = true
+            _isPlayerReady.value = true
+
+            recordPlay(freshTrack)
         }
-
-        val mediaItem = MediaItem.fromUri(track.previewUrl)
-        player.setMediaItem(mediaItem)
-        player.prepare()
-        player.play()
-        _isPlaying.value = true
-        _isPlayerReady.value = true
-
-        recordPlay(track)
     }
 
     fun togglePlay() {
@@ -274,6 +315,19 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             } finally {
                 _isWaveLoading.value = false
             }
+        }
+    }
+
+    // Метод для получения свежей ссылки, если старая протухла
+    private suspend fun getFreshTrack(track: Track): Track {
+        return try {
+            val query = "${track.artist} ${track.title}"
+            val result = MusicApi.search(query).getOrNull() ?: emptyList()
+            // Ищем трек с таким же ID, или берем первый похожий
+            val fresh = result.find { it.id == track.id } ?: result.firstOrNull()
+            fresh ?: track // Если не нашли, возвращаем старый
+        } catch (e: Exception) {
+            track // При ошибке интернета возвращаем старый
         }
     }
 

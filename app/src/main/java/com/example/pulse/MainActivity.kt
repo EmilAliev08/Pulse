@@ -43,6 +43,7 @@ import com.example.pulse.ui.theme.PulseTheme
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
 import android.net.Uri
+import androidx.compose.runtime.LaunchedEffect
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -104,7 +105,7 @@ fun MainAppContent(viewModel: MusicViewModel, authViewModel: AuthViewModel) {
         }
     }
 
-    // ✅ ИСПОЛЬЗУЕМ BOX ВМЕСТО COLUMN — это решает проблему ColumnScope.AnimatedVisibility
+
     Box(modifier = Modifier.fillMaxSize()) {
 
         // 1. ОСНОВНОЙ КОНТЕНТ (Главная / Избранное)
@@ -278,6 +279,10 @@ fun MainAppContent(viewModel: MusicViewModel, authViewModel: AuthViewModel) {
                 }
             }
         }
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshFavoritePreviews()
     }
 
     // 6. ПОЛНЫЙ ПЛЕЕР (Снаружи Box, поверх всего)

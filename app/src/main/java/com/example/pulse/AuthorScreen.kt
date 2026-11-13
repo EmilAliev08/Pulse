@@ -43,7 +43,9 @@ fun AuthorScreen(
         isLoading = true
         try {
             val result = MusicApi.search(artistName).getOrNull() ?: emptyList()
-            tracks = result
+            tracks = result.filter {
+                it.artist.equals(artistName, ignoreCase = true)
+            }
         } catch (e: Exception) {
             tracks = emptyList()
         } finally {
