@@ -1,1 +1,31 @@
-/build
+# Скомпилированные файлы
+*.class
+*.jar
+*.war
+*.aar
+
+# Папки сборки
+/build/
+/app/build/
+/.gradle/
+/captures/
+/.idea/
+*.iml
+*.ipr
+*.iws
+
+# Локальные настройки
+local.properties
+.gradle
+
+# APK (если не хочешь хранить в репо)
+# *.apk
+# *.aab
+
+# Системные файлы
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Логи
+*.log
